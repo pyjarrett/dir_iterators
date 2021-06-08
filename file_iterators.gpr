@@ -44,7 +44,7 @@ project File_Iterators is
    case Style_Checks is
       when "enabled" =>
          Style_Checks_Switches :=
-           ("-gnatyg",   -- GNAT Style checks
+           (--"-gnatyg",   -- GNAT Style checks
             "-gnaty-d",  -- Disable no DOS line terminators
             "-gnatyM80", -- Maximum line length
             "-gnatyO");  -- Overriding subprograms explicitly marked as such
@@ -77,11 +77,17 @@ project File_Iterators is
         Style_Checks_Switches &
         Contracts_Switches &
         ("-gnatw.X", -- Disable warnings for No_Exception_Propagation
-         "-gnatQ");  -- Don't quit. Generate ALI and tree files even if illegalities
+         "-gnatQ",   -- Don't quit. Generate ALI and tree files even if illegalities
+         "-gnat12"   -- Use Ada 2012
+         );
    end Compiler;
 
    package Binder is
       for Switches ("Ada") use ("-Es"); --  Symbolic traceback
    end Binder;
+
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-i4", "--no-separate-is");
+   end Pretty_Printer;
 
 end File_Iterators;
