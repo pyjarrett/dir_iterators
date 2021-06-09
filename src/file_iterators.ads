@@ -5,10 +5,12 @@ with Ada.Iterator_Interfaces;
 with Ada.Strings.Unbounded;
 
 package File_Iterators is
-     type Reference_Type
-      (Element : not null access constant Ada.Directories.Directory_Entry_Type)
-     is null record with
-       Implicit_Dereference => Element;
+    -- A simple type to return each directory entry.
+    type Reference_Type
+        (Element : not null access constant Ada.Directories
+             .Directory_Entry_Type)
+    is null record with
+        Implicit_Dereference => Element;
 
     type Cursor is private;
     function Has_Element (Position : Cursor) return Boolean;
@@ -67,6 +69,7 @@ private
         Current_Search  : Ada.Directories.Search_Type;
         Next_Entry      : aliased Ada.Directories.Directory_Entry_Type;
         Left_To_Process : String_Vectors.Vector;
+        Current_Level   : String_Vectors.Vector;
     end record;
 
     type Recursive_File_Iterator_Access is access all Recursive_File_Iterator;

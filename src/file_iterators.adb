@@ -9,18 +9,24 @@ package body File_Iterators is
     -- Internals
     ---------------------------------------------------------------------------
 
-    -- Return true if the entry is "." or "..".  This provides a mechanism
-    -- to detect files with these file names since they lead to problems
-    -- during recursion.
-    function Is_Current_Or_Parent_Directory
-        (Dir_Entry : AD.Directory_Entry_Type) return Boolean is
+    -- Return true if the entry is "..".  The "." entry is used to find the
+    -- starting directory and to report subdirectories immediately prior to
+    -- their contents.  However, the ".." entry is to the parent, so we need
+    -- to detect it to prevent infinite recursion.  The actual entry of a
+    -- directory needs to be skipped as well, because its "." version will
+    -- cause it to be reported.
+    function Should_Skip (Dir_Entry : AD.Directory_Entry_Type) return Boolean is
         Name : constant String := AD.Simple_Name (Dir_Entry);
+        use type AD.File_Kind;
     begin
         return
             ADH.Is_Parent_Directory_Name (Name)
-            or else ADH.Is_Current_Directory_Name (Name);
-    end Is_Current_Or_Parent_Directory;
+            or else
+            (AD.Kind (Dir_Entry) = AD.Directory
+             and then not ADH.Is_Current_Directory_Name (Name));
+    end Should_Skip;
 
+    -- Convenience override with a precondition.
     procedure Get_Next_Entry (It : in out Recursive_File_Iterator) with
         Inline,
         Pre => AD.More_Entries (It.Current_Search)
@@ -29,6 +35,7 @@ package body File_Iterators is
         AD.Get_Next_Entry (It.Current_Search, It.Next_Entry);
     end Get_Next_Entry;
 
+    --
     function Is_Current_Dir_Done
         (It : Recursive_File_Iterator) return Boolean is
         (not AD.More_Entries (It.Current_Search));
@@ -40,12 +47,22 @@ package body File_Iterators is
         (It : in out Recursive_File_Iterator) return Boolean with
         Post => (if AD.More_Entries (It.Current_Search) then It.Has_Valid_Entry)
     is
+        use type AD.File_Kind;
     begin
         while not Is_Current_Dir_Done (It) loop
             Get_Next_Entry (It);
 
-            It.Has_Valid_Entry :=
-                not Is_Current_Or_Parent_Directory (It.Next_Entry);
+            It.Has_Valid_Entry := not Should_Skip (It.Next_Entry);
+            if not It.Has_Valid_Entry
+                and then AD.Kind (It.Next_Entry) = AD.Directory
+                and then not ADH.Is_Parent_Directory_Name
+                    (AD.Simple_Name (It.Next_Entry))
+                and then not ADH.Is_Current_Directory_Name
+                    (AD.Simple_Name (It.Next_Entry)) then
+                It.Current_Level.Append
+                    (ASU.To_Unbounded_String (AD.Full_Name (It.Next_Entry)));
+            end if;
+
             if It.Has_Valid_Entry then
                 return True;
             end if;
@@ -54,18 +71,6 @@ package body File_Iterators is
         It.Has_Valid_Entry := False;
         return False;
     end Next_In_Dir;
-
-    -- Indicates that the search reached a new entry, and to update the search
-    -- based on the information in the current entry.
-    procedure Search_Reached (It : in out Recursive_File_Iterator) is
-        use AD;
-        Is_Dir : constant Boolean := AD.Kind (It.Next_Entry) = AD.Directory;
-    begin
-        if Is_Dir then
-            It.Left_To_Process.Append
-                (ASU.To_Unbounded_String (AD.Full_Name (It.Next_Entry)));
-        end if;
-    end Search_Reached;
 
     procedure Start_Search_In_Dir
         (It : in out Recursive_File_Iterator; Dir : String) is
@@ -80,13 +85,14 @@ package body File_Iterators is
     function Start (Dir : String) return Recursive_File_Iterator is
         -- Initializes the walk.  Note that `Done` might be true if there is
         -- nothing to walk.
-    begin
+        --
         -- TODO: Check for thrown error
+        Has_Next : Boolean;
+    begin
+        pragma Unreferenced (Has_Next);
         return It : Recursive_File_Iterator do
             Start_Search_In_Dir (It, Dir);
-            if Next_In_Dir (It) then
-                Search_Reached (It);
-            end if;
+            Has_Next := Next_In_Dir (It);
         end return;
     end Start;
 
@@ -95,24 +101,24 @@ package body File_Iterators is
     begin
         -- Make forward progress if possible.
         if Next_In_Dir (It) then
-            Search_Reached (It);
             return;
         end if;
 
         -- We're out of entries, so move onto the next depth.
         while Is_Current_Dir_Done (It) loop
+            It.Left_To_Process.Prepend_Vector (It.Current_Level);
+            It.Current_Level.Clear;
+
             if It.Left_To_Process.Is_Empty then
                 -- Search is done!
                 return;
             end if;
 
-            -- Breadth search by default.
             Start_Search_In_Dir
                 (It, ASU.To_String (It.Left_To_Process.First_Element));
             It.Left_To_Process.Delete_First;
 
             if Next_In_Dir (It) then
-                Search_Reached (It);
                 return;
             end if;
         end loop;
@@ -123,7 +129,8 @@ package body File_Iterators is
         return
             not It.Has_Valid_Entry
             and then not AD.More_Entries (It.Current_Search)
-            and then It.Left_To_Process.Is_Empty;
+            and then It.Left_To_Process.Is_Empty
+            and then It.Current_Level.Is_Empty;
     end Done;
 
     function Iterate
