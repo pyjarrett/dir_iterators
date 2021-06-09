@@ -4,7 +4,8 @@ with Ada.Finalization;
 with Ada.Iterator_Interfaces;
 with Ada.Strings.Unbounded;
 
-package File_Iterators is
+package Dir_Iterators.Recursive is
+
     -- A simple type to return each directory entry.
     type Reference_Type
         (Element : not null access constant Ada.Directories
@@ -15,35 +16,35 @@ package File_Iterators is
     type Cursor is private;
     function Has_Element (Position : Cursor) return Boolean;
 
-    package Recursive_File_Iterator_Interfaces is new Ada.Iterator_Interfaces
+    package Recursive_Dir_Iterator_Interfaces is new Ada.Iterator_Interfaces
         (Cursor => Cursor, Has_Element => Has_Element);
 
-    type Recursive_File_Iterator is
+    type Recursive_Dir_Iterator is
         new Ada.Finalization.Limited_Controlled and
-            Recursive_File_Iterator_Interfaces.Forward_Iterator with private;
+            Recursive_Dir_Iterator_Interfaces.Forward_Iterator with private;
 
-    overriding function First (Object : Recursive_File_Iterator) return Cursor;
+    overriding function First (Object : Recursive_Dir_Iterator) return Cursor;
     overriding function Next
-        (It : Recursive_File_Iterator; Position : Cursor) return Cursor;
+        (It : Recursive_Dir_Iterator; Position : Cursor) return Cursor;
 
-    type Recursive_Dir_Tree is tagged limited private with
+    type Recursive_Dir_Walk is tagged limited private with
         Default_Iterator  => Iterate,
         Iterator_Element  => Reference_Type,
         Constant_Indexing => Element_Value;
 
-    function Walk (Dir : String) return Recursive_Dir_Tree;
+    function Walk (Dir : String) return Recursive_Dir_Walk;
 
     function Iterate
-        (Tree : Recursive_Dir_Tree)
-         return Recursive_File_Iterator_Interfaces.Forward_Iterator'Class;
+        (Tree : Recursive_Dir_Walk)
+         return Recursive_Dir_Iterator_Interfaces.Forward_Iterator'Class;
 
     function Element_Value
-        (Tree : Recursive_Dir_Tree; Position : Cursor) return Reference_Type;
+        (Tree : Recursive_Dir_Walk; Position : Cursor) return Reference_Type;
 
 private
 
     -- The base type that lets us use an iterator in a nice `for` loop.
-    type Recursive_Dir_Tree is tagged limited record
+    type Recursive_Dir_Walk is tagged limited record
         Root : Ada.Strings.Unbounded.Unbounded_String;
     end record;
 
@@ -53,8 +54,8 @@ private
          Element_Type => Ada.Strings.Unbounded.Unbounded_String,
          "="          => Ada.Strings.Unbounded."=");
 
-    type Recursive_File_Iterator is new Ada.Finalization.Limited_Controlled and
-        Recursive_File_Iterator_Interfaces.Forward_Iterator with record
+    type Recursive_Dir_Iterator is new Ada.Finalization.Limited_Controlled and
+        Recursive_Dir_Iterator_Interfaces.Forward_Iterator with record
         -- There's some weirdness and complexity resulting from skipping the
         -- files of the current and parent directories (. and .. respectively).
         --
@@ -72,10 +73,11 @@ private
         Current_Level   : String_Vectors.Vector;
     end record;
 
-    type Recursive_File_Iterator_Access is access all Recursive_File_Iterator;
+    type Recursive_Dir_Iterator_Access is access all Recursive_Dir_Iterator;
 
     type Cursor is record
-        It : Recursive_File_Iterator_Access;
+        It : Recursive_Dir_Iterator_Access;
     end record;
 
-end File_Iterators;
+
+end Dir_Iterators.Recursive;

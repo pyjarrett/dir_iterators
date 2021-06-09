@@ -1,5 +1,5 @@
-name = "file_iterators"
-description = "Shiny new project"
+name = "dir_iterators"
+description = "Ways of moving around directory trees"
 version = "0.0.0"
 
 authors = ["Paul Jarrett"]

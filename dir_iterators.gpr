@@ -1,6 +1,6 @@
-project File_Iterators is
+project Dir_Iterators is
 
-   for Library_Name use "File_Iterators";
+   for Library_Name use "Dir_Iterators";
    for Library_Version use "0.0.0";
 
    for Source_Dirs use ("src");
@@ -10,17 +10,17 @@ project File_Iterators is
 
    type Library_Type_Type is ("relocatable", "static", "static-pic");
    Library_Type : Library_Type_Type :=
-     external ("FILE_ITERATORS_LIBRARY_TYPE", external ("LIBRARY_TYPE", "static"));
+     external ("DIR_ITERATORS_LIBRARY_TYPE", external ("LIBRARY_TYPE", "static"));
    for Library_Kind use Library_Type;
 
    type Enabled_Kind is ("enabled", "disabled");
-   Compile_Checks : Enabled_Kind := External ("FILE_ITERATORS_COMPILE_CHECKS", "enabled");
-   Runtime_Checks : Enabled_Kind := External ("FILE_ITERATORS_RUNTIME_CHECKS", "enabled");
-   Style_Checks : Enabled_Kind := External ("FILE_ITERATORS_STYLE_CHECKS", "enabled");
-   Contracts_Checks : Enabled_Kind := External ("FILE_ITERATORS_CONTRACTS", "enabled");
+   Compile_Checks : Enabled_Kind := External ("DIR_ITERATORS_COMPILE_CHECKS", "enabled");
+   Runtime_Checks : Enabled_Kind := External ("DIR_ITERATORS_RUNTIME_CHECKS", "enabled");
+   Style_Checks : Enabled_Kind := External ("DIR_ITERATORS_STYLE_CHECKS", "enabled");
+   Contracts_Checks : Enabled_Kind := External ("DIR_ITERATORS_CONTRACTS", "enabled");
 
    type Build_Kind is ("debug", "optimize");
-   Build_Mode : Build_Kind := External ("FILE_ITERATORS_BUILD_MODE", "debug");
+   Build_Mode : Build_Kind := External ("DIR_ITERATORS_BUILD_MODE", "debug");
 
    Compile_Checks_Switches := ();
    case Compile_Checks is
@@ -90,4 +90,4 @@ project File_Iterators is
       for Default_Switches ("ada") use ("-i4", "--no-separate-is");
    end Pretty_Printer;
 
-end File_Iterators;
+end Dir_Iterators;

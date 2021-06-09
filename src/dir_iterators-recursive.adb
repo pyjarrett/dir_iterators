@@ -1,6 +1,7 @@
 with Ada.Directories.Hierarchical_File_Names;
 
-package body File_Iterators is
+package body Dir_Iterators.Recursive is
+
     package AD renames Ada.Directories;
     package ADH renames Ada.Directories.Hierarchical_File_Names;
     package ASU renames Ada.Strings.Unbounded;
@@ -27,7 +28,7 @@ package body File_Iterators is
     end Should_Skip;
 
     -- Convenience override with a precondition.
-    procedure Get_Next_Entry (It : in out Recursive_File_Iterator) with
+    procedure Get_Next_Entry (It : in out Recursive_Dir_Iterator) with
         Inline,
         Pre => AD.More_Entries (It.Current_Search)
     is
@@ -37,14 +38,14 @@ package body File_Iterators is
 
     --
     function Is_Current_Dir_Done
-        (It : Recursive_File_Iterator) return Boolean is
+        (It : Recursive_Dir_Iterator) return Boolean is
         (not AD.More_Entries (It.Current_Search));
 
     -- Moves to the first entry which isn't the current or parent directory.
     -- Returns false if reaches the end of the current directory being
     -- iterated.
     function Next_In_Dir
-        (It : in out Recursive_File_Iterator) return Boolean with
+        (It : in out Recursive_Dir_Iterator) return Boolean with
         Post => (if AD.More_Entries (It.Current_Search) then It.Has_Valid_Entry)
     is
         use type AD.File_Kind;
@@ -73,7 +74,7 @@ package body File_Iterators is
     end Next_In_Dir;
 
     procedure Start_Search_In_Dir
-        (It : in out Recursive_File_Iterator; Dir : String) is
+        (It : in out Recursive_Dir_Iterator; Dir : String) is
         Filter : constant AD.Filter_Type :=
             (AD.Ordinary_File | AD.Directory => True, others => False);
     begin
@@ -82,7 +83,7 @@ package body File_Iterators is
              Filter => Filter);
     end Start_Search_In_Dir;
 
-    function Start (Dir : String) return Recursive_File_Iterator is
+    function Start (Dir : String) return Recursive_Dir_Iterator is
         -- Initializes the walk.  Note that `Done` might be true if there is
         -- nothing to walk.
         --
@@ -90,13 +91,13 @@ package body File_Iterators is
         Has_Next : Boolean;
     begin
         pragma Unreferenced (Has_Next);
-        return It : Recursive_File_Iterator do
+        return It : Recursive_Dir_Iterator do
             Start_Search_In_Dir (It, Dir);
             Has_Next := Next_In_Dir (It);
         end return;
     end Start;
 
-    procedure Next (It : in out Recursive_File_Iterator) is
+    procedure Next (It : in out Recursive_Dir_Iterator) is
         package ASU renames Ada.Strings.Unbounded;
     begin
         -- Make forward progress if possible.
@@ -124,7 +125,7 @@ package body File_Iterators is
         end loop;
     end Next;
 
-    function Done (It : Recursive_File_Iterator) return Boolean is
+    function Done (It : Recursive_Dir_Iterator) return Boolean is
     begin
         return
             not It.Has_Valid_Entry
@@ -134,15 +135,15 @@ package body File_Iterators is
     end Done;
 
     function Iterate
-        (Tree : Recursive_Dir_Tree)
-         return Recursive_File_Iterator_Interfaces.Forward_Iterator'Class is
+        (Tree : Recursive_Dir_Walk)
+         return Recursive_Dir_Iterator_Interfaces.Forward_Iterator'Class is
     begin
         return Start (ASU.To_String (Tree.Root));
     end Iterate;
 
-    function Walk (Dir : String) return Recursive_Dir_Tree is
+    function Walk (Dir : String) return Recursive_Dir_Walk is
     begin
-        return RDT : Recursive_Dir_Tree do
+        return RDT : Recursive_Dir_Walk do
             RDT.Root := Ada.Strings.Unbounded.To_Unbounded_String (Dir);
         end return;
     end Walk;
@@ -153,23 +154,23 @@ package body File_Iterators is
     end Has_Element;
 
     overriding function First
-        (Object : Recursive_File_Iterator) return Cursor is
+        (Object : Recursive_Dir_Iterator) return Cursor is
     begin
         return Cursor'(It => Object'Unrestricted_Access);
     end First;
 
     overriding function Next
-        (It : Recursive_File_Iterator; Position : Cursor) return Cursor is
+        (It : Recursive_Dir_Iterator; Position : Cursor) return Cursor is
     begin
         Next (Position.It.all);
         return Position;
     end Next;
 
     function Element_Value
-        (Tree : Recursive_Dir_Tree; Position : Cursor) return Reference_Type is
+        (Tree : Recursive_Dir_Walk; Position : Cursor) return Reference_Type is
     begin
         pragma Unreferenced (Tree);
         return Reference_Type'(Element => Position.It.Next_Entry'Access);
     end Element_Value;
 
-end File_Iterators;
+end Dir_Iterators.Recursive;
