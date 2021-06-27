@@ -60,7 +60,9 @@ package body Dir_Iterators.Recursive is
             Get_Next_Entry (It);
 
             It.Has_Valid_Entry := not Should_Skip (It.Next_Entry);
+
             if not It.Has_Valid_Entry
+               and then (It.Filter = null or else It.Filter(It.Next_Entry))
                and then AD.Kind (It.Next_Entry) = AD.Directory
                and then not Is_Parent_Directory_Name
                   (AD.Simple_Name (It.Next_Entry))
@@ -90,16 +92,17 @@ package body Dir_Iterators.Recursive is
             Filter => Filter);
     end Start_Search_In_Dir;
 
-    function Start (Dir : String) return Recursive_Dir_Iterator is
+    function Start (Dir : Recursive_Dir_Walk) return Recursive_Dir_Iterator is
         -- Initializes the walk.  Note that `Done` might be true if there is
         -- nothing to walk.
         --
         -- TODO: Check for thrown error
         Has_Next : Boolean;
+        Root_Dir : constant String := ASU.To_String(Dir.Root);
     begin
         pragma Unreferenced (Has_Next);
-        return It : Recursive_Dir_Iterator do
-            Start_Search_In_Dir (It, Dir);
+        return It : Recursive_Dir_Iterator (Dir.Filter) do
+            Start_Search_In_Dir (It, Root_Dir);
             Has_Next := Next_In_Dir (It);
         end return;
     end Start;
@@ -114,6 +117,8 @@ package body Dir_Iterators.Recursive is
 
         -- We're out of entries, so move onto the next depth.
         while Is_Current_Dir_Done (It) loop
+            -- Add the running list of the last directories content to front
+            -- to be processed first.
             It.Left_To_Process.Prepend (It.Current_Level);
             It.Current_Level.Clear;
 
@@ -145,12 +150,14 @@ package body Dir_Iterators.Recursive is
        (Tree : Recursive_Dir_Walk)
         return Recursive_Dir_Iterator_Interfaces.Forward_Iterator'Class is
     begin
-        return Start (ASU.To_String (Tree.Root));
+        return Start (Tree);
     end Iterate;
 
-    function Walk (Dir : String) return Recursive_Dir_Walk is
+    function Walk (Dir : String; Filter : access function
+       (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean)
+                   return Recursive_Dir_Walk is
     begin
-        return RDT : Recursive_Dir_Walk do
+        return RDT : Recursive_Dir_Walk (Filter) do
             RDT.Root := Ada.Strings.Unbounded.To_Unbounded_String (Dir);
         end return;
     end Walk;
@@ -159,6 +166,13 @@ package body Dir_Iterators.Recursive is
     begin
         return not Done (Position.It.all);
     end Has_Element;
+
+    function Walk_Everything
+        (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean is
+    begin
+        pragma Unreferenced(Dir_Entry);
+        return True;
+    end Walk_Everything;
 
     overriding function First
        (Object : Recursive_Dir_Iterator) return Cursor is
