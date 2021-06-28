@@ -127,6 +127,9 @@ package body Dir_Iterators.Recursive is
                 return;
             end if;
 
+            -- No End_Search is needed here since the search will be finalized
+            -- internally before being reused.
+
             Start_Search_In_Dir
                (It, ASU.To_String (It.Left_To_Process.First_Element));
             It.Left_To_Process.Delete_First;
@@ -154,7 +157,8 @@ package body Dir_Iterators.Recursive is
     end Iterate;
 
     function Walk (Dir : String; Filter : access function
-       (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean)
+       (Dir_Entry : Ada.Directories.Directory_Entry_Type)
+                   return Boolean := null)
                    return Recursive_Dir_Walk is
     begin
         return RDT : Recursive_Dir_Walk (Filter) do
@@ -166,13 +170,6 @@ package body Dir_Iterators.Recursive is
     begin
         return not Done (Position.It.all);
     end Has_Element;
-
-    function Walk_Everything
-        (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean is
-    begin
-        pragma Unreferenced(Dir_Entry);
-        return True;
-    end Walk_Everything;
 
     overriding function First
        (Object : Recursive_Dir_Iterator) return Cursor is
@@ -193,5 +190,12 @@ package body Dir_Iterators.Recursive is
         pragma Unreferenced (Tree);
         return Reference_Type'(Element => Position.It.Next_Entry'Access);
     end Element_Value;
+
+    overriding
+    procedure Finalize (It : in out Recursive_Dir_Iterator) is
+    begin
+        -- Close out the last search.
+        AD.End_Search (It.Current_Search);
+    end Finalize;
 
 end Dir_Iterators.Recursive;

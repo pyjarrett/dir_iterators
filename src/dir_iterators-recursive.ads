@@ -23,9 +23,6 @@ package Dir_Iterators.Recursive is
        (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean;
     -- A function used to prune directories or files from the search results.
 
-    function Walk_Everything
-        (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean;
-
     type Recursive_Dir_Iterator(Filter : access function
        (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean) is
        new Ada.Finalization.Limited_Controlled and
@@ -43,7 +40,8 @@ package Dir_Iterators.Recursive is
 
     function Walk
        (Dir : String; Filter : access function
-       (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean)
+       (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean
+       := null)
         return Recursive_Dir_Walk;
 
     function Iterate
@@ -86,6 +84,9 @@ private
         Left_To_Process : String_Vectors.Vector;
         Current_Level   : String_Vectors.Vector;
     end record;
+
+    overriding
+    procedure Finalize (It : in out Recursive_Dir_Iterator);
 
     type Recursive_Dir_Iterator_Access is access all Recursive_Dir_Iterator;
 
