@@ -184,11 +184,15 @@ package body Dir_Iterators.Recursive is
         return Position;
     end Next;
 
-    function Element_Value
-       (Tree : Recursive_Dir_Walk; Position : Cursor) return Reference_Type is
-    begin
+   function Element_Value (Tree : Recursive_Dir_Walk; Position : Cursor) return Reference_Type is
         pragma Unreferenced (Tree);
-        return Reference_Type'(Element => Position.It.Next_Entry'Access);
+
+        -- Workaround for a bug in GCC 10.3, which labels this as a
+        -- dangling reference.
+        -- https://github.com/gcc-mirror/gcc/commit/25b4c873d19ccdc7e9a333eab8b5ab8e29a35976
+        Res : constant Reference_Type := Reference_Type'(Element => Position.It.Next_Entry'Access);
+    begin
+        return Res;
     end Element_Value;
 
     overriding
