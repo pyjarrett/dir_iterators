@@ -41,6 +41,7 @@ package body Dir_Iterators.Ancestor is
     overriding function Next
        (It : Ancestor_Dir_Iterator; Position : Cursor) return Cursor is
     begin
+        pragma Unreferenced (It);
         return
            Cursor'
               (Current =>

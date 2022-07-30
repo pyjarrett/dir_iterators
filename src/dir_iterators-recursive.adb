@@ -180,6 +180,7 @@ package body Dir_Iterators.Recursive is
     overriding function Next
        (It : Recursive_Dir_Iterator; Position : Cursor) return Cursor is
     begin
+        pragma Unreferenced (It);
         Next (Position.It.all);
         return Position;
     end Next;
