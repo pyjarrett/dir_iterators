@@ -1,6 +1,6 @@
 name = "dir_iterators"
 description = "Ways of moving around directory trees"
-version = "0.0.4"
+version = "0.0.5"
 website = "https://github.com/pyjarrett/dir_iterators"
 authors = ["Paul Jarrett"]
 licenses = "Apache-2.0"
