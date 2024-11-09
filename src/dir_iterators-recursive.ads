@@ -23,8 +23,7 @@ package Dir_Iterators.Recursive is
        (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean;
     -- A function used to prune directories or files from the search results.
 
-    type Recursive_Dir_Iterator(Filter : access function
-       (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean) is
+    type Recursive_Dir_Iterator is
        new Ada.Finalization.Limited_Controlled and
           Recursive_Dir_Iterator_Interfaces.Forward_Iterator with private;
 
@@ -32,16 +31,14 @@ package Dir_Iterators.Recursive is
     overriding function Next
        (It : Recursive_Dir_Iterator; Position : Cursor) return Cursor;
 
-    type Recursive_Dir_Walk (Filter : Filter_Function) is
+    type Recursive_Dir_Walk is
        tagged limited private with
         Default_Iterator  => Iterate,
         Iterator_Element  => Reference_Type,
         Constant_Indexing => Element_Value;
 
     function Walk
-       (Dir : String; Filter : access function
-       (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean
-       := null)
+       (Dir : String; File_Filter : Filter_Function := null)
         return Recursive_Dir_Walk;
 
     function Iterate
@@ -54,8 +51,9 @@ package Dir_Iterators.Recursive is
 private
 
     -- The base type that lets us use an iterator in a nice `for` loop.
-    type Recursive_Dir_Walk(Filter : Filter_Function) is tagged limited record
+    type Recursive_Dir_Walk is tagged limited record
         Root : Ada.Strings.Unbounded.Unbounded_String;
+        File_Filter : Filter_Function;
     end record;
 
     -- The list of unprocessed directories needs to be stored.
@@ -64,10 +62,8 @@ private
         Element_Type => Ada.Strings.Unbounded.Unbounded_String,
         "="          => Ada.Strings.Unbounded."=");
 
-    type Recursive_Dir_Iterator (Filter : access function
-       (Dir_Entry : Ada.Directories.Directory_Entry_Type) return Boolean)
-    is new Ada.Finalization.Limited_Controlled and
-       Recursive_Dir_Iterator_Interfaces.Forward_Iterator with record
+    type Recursive_Dir_Iterator is new Ada.Finalization.Limited_Controlled
+       and Recursive_Dir_Iterator_Interfaces.Forward_Iterator with record
         -- There's some weirdness and complexity resulting from skipping the
         -- files of the current and parent directories (. and .. respectively).
         --
@@ -83,6 +79,7 @@ private
         Next_Entry      : aliased Ada.Directories.Directory_Entry_Type;
         Left_To_Process : String_Vectors.Vector;
         Current_Level   : String_Vectors.Vector;
+        File_Filter     : Filter_Function;
     end record;
 
     overriding

@@ -1,7 +1,13 @@
+--  with Ada.Text_IO;
+
 package body Dir_Iterators.Recursive is
 
     package AD renames Ada.Directories;
+   --   package AIO renames Ada.Text_IO;
     package ASU renames Ada.Strings.Unbounded;
+
+
+    use type AD.File_Kind;
 
     ---------------------------------------------------------------------------
     -- Internals
@@ -14,24 +20,6 @@ package body Dir_Iterators.Recursive is
     function Is_Parent_Directory_Name (Dir : String) return Boolean is
        (Dir = "..");
 
-    -- Return true if the entry is "..".  The "." entry is used to find the
-    -- starting directory and to report subdirectories immediately prior to
-    -- their contents.  However, the ".." entry is to the parent, so we need
-    -- to detect it to prevent infinite recursion.  The actual entry of a
-    -- directory needs to be skipped as well, because its "." version will
-    -- cause it to be reported.
-    function Should_Skip
-       (Dir_Entry : AD.Directory_Entry_Type) return Boolean is
-        Name : constant String := AD.Simple_Name (Dir_Entry);
-        use type AD.File_Kind;
-    begin
-        return
-           Is_Parent_Directory_Name (Name)
-           or else
-           (AD.Kind (Dir_Entry) = AD.Directory
-            and then not Is_Current_Directory_Name (Name));
-    end Should_Skip;
-
     -- Convenience override with a precondition.
     procedure Get_Next_Entry (It : in out Recursive_Dir_Iterator) with
         Inline,
@@ -41,10 +29,16 @@ package body Dir_Iterators.Recursive is
         AD.Get_Next_Entry (It.Current_Search, It.Next_Entry);
     end Get_Next_Entry;
 
-    --
     function Is_Current_Dir_Done
        (It : Recursive_Dir_Iterator) return Boolean is
        (not AD.More_Entries (It.Current_Search));
+
+   function Is_Next_Level_Dir (Dir_Entry : AD.Directory_Entry_Type) return Boolean is
+      Base_Name : constant String := AD.Simple_Name (Dir_Entry);
+   begin
+      return AD.Kind (Dir_Entry) = AD.Directory and then (not (
+         Is_Current_Directory_Name (Base_Name) or else Is_Parent_Directory_Name (Base_Name)));
+   end Is_Next_Level_Dir;
 
     -- Moves to the first entry which isn't the current or parent directory.
     -- Returns false if reaches the end of the current directory being
@@ -54,27 +48,29 @@ package body Dir_Iterators.Recursive is
         Post =>
         (if AD.More_Entries (It.Current_Search) then It.Has_Valid_Entry)
     is
-        use type AD.File_Kind;
     begin
         while not Is_Current_Dir_Done (It) loop
             Get_Next_Entry (It);
 
-            It.Has_Valid_Entry := not Should_Skip (It.Next_Entry);
-
-            if not It.Has_Valid_Entry
-               and then (It.Filter = null or else It.Filter(It.Next_Entry))
-               and then AD.Kind (It.Next_Entry) = AD.Directory
-               and then not Is_Parent_Directory_Name
-                  (AD.Simple_Name (It.Next_Entry))
-               and then not Is_Current_Directory_Name
-                  (AD.Simple_Name (It.Next_Entry))
-            then
+            -- The "." entry is used to find the
+            -- starting directory and to report subdirectories immediately prior to
+            -- their contents.  However, the ".." entry is to the parent, so we need
+            -- to detect it to prevent infinite recursion.  The actual entry of a
+            -- directory needs to be skipped as well, because its "." version will
+            -- cause it to be reported.
+            It.Has_Valid_Entry := False;
+            if Is_Next_Level_Dir (It.Next_Entry) then
                 It.Current_Level.Append
                    (ASU.To_Unbounded_String (AD.Full_Name (It.Next_Entry)));
-            end if;
-
-            if It.Has_Valid_Entry then
-                return True;
+            elsif Is_Current_Directory_Name (AD.Simple_Name (It.Next_Entry)) and then (It.File_Filter = null) then
+               It.Has_Valid_Entry := True;
+               return true;
+            elsif not Is_Parent_Directory_Name (AD.Simple_Name (It.Next_Entry)) then
+               It.Has_Valid_Entry := (It.File_Filter = null or else
+                  (AD.Kind (It.Next_Entry) = AD.Ordinary_File and then It.File_Filter(It.Next_Entry)));
+               if It.Has_Valid_Entry then
+                  return True;
+               end if;
             end if;
         end loop;
 
@@ -92,25 +88,12 @@ package body Dir_Iterators.Recursive is
             Filter => Filter);
     end Start_Search_In_Dir;
 
-    function Start (Dir : Recursive_Dir_Walk) return Recursive_Dir_Iterator is
-        -- Initializes the walk.  Note that `Done` might be true if there is
-        -- nothing to walk.
-        --
-        -- TODO: Check for thrown error
-        Root_Dir : constant String := ASU.To_String(Dir.Root);
-    begin
-        return It : Recursive_Dir_Iterator (Dir.Filter) do
-            Start_Search_In_Dir (It, Root_Dir);
-            It.Has_Valid_Entry := Next_In_Dir (It);
-        end return;
-    end Start;
-
-    procedure Next (It : in out Recursive_Dir_Iterator) is
+    function Descend (It : in out Recursive_Dir_Iterator) return Boolean is
         package ASU renames Ada.Strings.Unbounded;
     begin
         -- Make forward progress if possible.
         if Next_In_Dir (It) then
-            return;
+            return True;
         end if;
 
         -- We're out of entries, so move onto the next depth.
@@ -122,7 +105,7 @@ package body Dir_Iterators.Recursive is
 
             if It.Left_To_Process.Is_Empty then
                 -- Search is done!
-                return;
+                return False;
             end if;
 
             -- No End_Search is needed here since the search will be finalized
@@ -133,9 +116,30 @@ package body Dir_Iterators.Recursive is
             It.Left_To_Process.Delete_First;
 
             if Next_In_Dir (It) then
-                return;
+                return True;
             end if;
         end loop;
+        return False;
+    end Descend;
+
+    function Start (Dir : Recursive_Dir_Walk) return Recursive_Dir_Iterator is
+        -- Initializes the walk.  Note that `Done` might be true if there is
+        -- nothing to walk.
+        --
+        -- TODO: Check for thrown error
+        Root_Dir : constant String := ASU.To_String(Dir.Root);
+    begin
+        return It : Recursive_Dir_Iterator do
+            It.File_Filter := Dir.File_Filter;
+            Start_Search_In_Dir (It, Root_Dir);
+            It.Has_Valid_Entry := Descend (It);
+        end return;
+    end Start;
+
+    procedure Next (It : in out Recursive_Dir_Iterator) is
+        Unused : constant Boolean := Descend (It);
+    begin
+        pragma Unreferenced (Unused);
     end Next;
 
     function Done (It : Recursive_Dir_Iterator) return Boolean is
@@ -154,13 +158,12 @@ package body Dir_Iterators.Recursive is
         return Start (Tree);
     end Iterate;
 
-    function Walk (Dir : String; Filter : access function
-       (Dir_Entry : Ada.Directories.Directory_Entry_Type)
-                   return Boolean := null)
+    function Walk (Dir : String; File_Filter : Filter_Function := null)
                    return Recursive_Dir_Walk is
     begin
-        return RDT : Recursive_Dir_Walk (Filter) do
+        return RDT : Recursive_Dir_Walk do
             RDT.Root := Ada.Strings.Unbounded.To_Unbounded_String (Dir);
+            RDT.File_Filter := File_Filter;
         end return;
     end Walk;
 
