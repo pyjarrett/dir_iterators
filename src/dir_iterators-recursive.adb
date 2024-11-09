@@ -97,13 +97,11 @@ package body Dir_Iterators.Recursive is
         -- nothing to walk.
         --
         -- TODO: Check for thrown error
-        Has_Next : Boolean;
         Root_Dir : constant String := ASU.To_String(Dir.Root);
     begin
-        pragma Unreferenced (Has_Next);
         return It : Recursive_Dir_Iterator (Dir.Filter) do
             Start_Search_In_Dir (It, Root_Dir);
-            Has_Next := Next_In_Dir (It);
+            It.Has_Valid_Entry := Next_In_Dir (It);
         end return;
     end Start;
 
